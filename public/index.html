@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08081c">
+<title>ChAI Quiz</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="logo">ChAI</span> Quiz</div>
+    <span id="conn" class="pill off">connecting…</span>
+  </header>
+
+  <!-- Join -->
+  <form id="joinView" class="card stack" autocomplete="off">
+    <div class="hero">
+      <div class="hero-emo">⚡</div>
+      <h1>Join the quiz</h1>
+      <p class="muted">Pick your team, add your name, and get your buzzer finger ready.</p>
+    </div>
+    <div>
+      <label for="team">Your team</label>
+      <select id="team" required><option value="">Choose a team…</option></select>
+    </div>
+    <div>
+      <label for="name">Your name</label>
+      <input id="name" maxlength="24" required placeholder="e.g. Priya">
+    </div>
+    <button class="primary block" type="submit">Join team →</button>
+    <div id="joinErr" class="err"></div>
+  </form>
+
+  <!-- Play -->
+  <div id="playView" class="hidden">
+    <div class="row between" style="margin-bottom:14px">
+      <div class="row" style="gap:8px;min-width:0"><b id="meName" style="white-space:nowrap"></b><span id="meChip"></span></div>
+      <button id="leave" class="ghost sm">Switch</button>
+    </div>
+
+    <div class="card">
+      <div class="row between"><div class="row" style="gap:0"><div id="qnum" class="qnum"></div><span id="lvl"></span></div><span id="phase" class="pill"></span></div>
+      <div id="question" class="question"></div>
+      <div id="result" class="banner hidden"></div>
+      <div id="answer" class="answer hidden"></div>
+      <div id="timerBox" class="timer hidden">
+        <div class="row between small" style="margin-bottom:7px"><span class="muted">Time to buzz</span><span id="timerText" class="timer-text"></span></div>
+        <div id="bar" class="bar"><i></i></div>
+      </div>
+    </div>
+
+    <div id="buzzArea">
+      <div class="buzz-zone"><button id="buzzer" class="buzzer" disabled>BUZZ</button></div>
+      <div id="status" class="status"></div>
+    </div>
+
+    <div id="orderCard" class="card hidden">
+      <h3>Buzz order</h3>
+      <ul id="order" class="buzzes"></ul>
+    </div>
+
+    <div id="resultsCard" class="card hidden">
+      <h2 class="center" style="font-size:24px">🏆 Final results</h2>
+      <div id="myRank" class="myrank"></div>
+      <div id="podium" class="podium"></div>
+      <ol id="board" class="lb"></ol>
+    </div>
+
+    <div id="peopleCard" class="card hidden">
+      <h3>⭐ Top players</h3>
+      <ol id="people" class="lb"></ol>
+    </div>
+
+    <div id="scoreCard" class="card hidden">
+      <h3>Leaderboard</h3>
+      <ol id="scores" class="lb"></ol>
+    </div>
+  </div>
+</div>
+
+<script src="/live.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let me = null, st = null, localDeadline = 0, tick = null, teamSig = '', triedRejoin = false;
+
+// Identity is per browser TAB (sessionStorage): survives refresh, but two tabs = two players.
+// localStorage only remembers your last name/team to pre-fill the form.
+function load(k, store = sessionStorage) { try { return JSON.parse(store.getItem(k)); } catch { return null; } }
+function save(k, v, store = sessionStorage) { try { v ? store.setItem(k, JSON.stringify(v)) : store.removeItem(k); } catch {} }
+
+const clientId = load('chai-quiz-id') || (crypto.randomUUID?.() || String(Math.random()).slice(2) + Date.now());
+save('chai-quiz-id', clientId);
+const saved = load('chai-quiz-me');            // this tab's seat → auto-rejoin
+const last = load('chai-quiz-last', localStorage); // pre-fill only
+if (saved || last) $('name').value = (saved || last).name;
+
+function fillTeams(list) {
+  const sig = JSON.stringify(list.map(t => [t.team, t.count]));
+  if (sig === teamSig) return;
+  teamSig = sig;
+  const sel = $('team'), keep = sel.value || saved?.team || last?.team || '';
+  sel.replaceChildren(el('option', '', 'Choose a team…'));
+  sel.firstChild.value = '';
+  for (const t of list) {
+    const o = el('option', '', `${t.emoji}  ${t.team}${t.count ? `  ·  ${t.count} in` : ''}`);
+    o.value = t.team; sel.append(o);
+  }
+  sel.value = list.some(t => t.team === keep) ? keep : '';
+}
+
+async function join(team, name, silent) {
+  const res = await api('join', { id: clientId, team, name });
+  if (!res?.ok) { if (!silent) $('joinErr').textContent = res?.error || 'Could not join'; return false; }
+  $('joinErr').textContent = '';
+  me = { team: res.team, name: res.name }; save('chai-quiz-me', me); save('chai-quiz-last', me, localStorage);
+  $('joinView').classList.add('hidden'); $('playView').classList.remove('hidden');
+  render();
+  return true;
+}
+
+$('team').addEventListener('change', () => { $('joinErr').textContent = ''; });
+$('name').addEventListener('input', () => { $('joinErr').textContent = ''; });
+$('joinView').addEventListener('submit', (e) => { e.preventDefault(); join($('team').value, $('name').value); });
+$('leave').addEventListener('click', () => { save('chai-quiz-me', null); me = null; location.reload(); });
+
+live({ role: 'player', id: clientId }, (s) => {
+  st = s;
+  localDeadline = s.remainingMs ? Date.now() + s.remainingMs : 0;
+  fillTeams(s.teamList);
+  if (!me && saved && !triedRejoin) { triedRejoin = true; if (s.teamList.some(t => t.team === saved.team)) join(saved.team, saved.name, true); }
+  render();
+}, (ok) => {
+  $('conn').textContent = ok ? 'live' : 'reconnecting…';
+  $('conn').className = 'pill ' + (ok ? 'live' : 'off');
+  const who = me || saved;
+  // silent auto-rejoin; skip if the remembered team no longer exists (e.g. old test data)
+  if (ok && who && st?.teamList?.some(t => t.team === who.team)) join(who.team, who.name, true);
+});
+
+$('buzzer').addEventListener('pointerdown', buzz);
+$('buzzer').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') buzz(e); });
+async function buzz(e) {
+  e.preventDefault();
+  if ($('buzzer').disabled) return;
+  $('buzzer').disabled = true;
+  let res = await api('buzz', { id: clientId });
+  if (!res.ok && res.error === 'Please join again' && me && await join(me.team, me.name)) res = await api('buzz', { id: clientId });
+  if (res.ok) navigator.vibrate?.(80);
+  render(res.ok ? null : res.error);
+}
+
+function render(err) {
+  if (!st || !me) return;
+  const s = st;
+  const myMeta = s.teamList.find(t => t.team === me.team) || { team: me.team };
+  $('meName').textContent = me.name;
+  $('meChip').replaceChildren(chip(myMeta));
+
+  const inQ = s.index >= 0 && s.index < s.total;
+  const ended = s.phase === 'ended';
+  const myTeamRow = s.leaderboard.find(r => r.team === me.team);
+
+  $('qnum').textContent = inQ ? `Question ${s.index + 1} of ${s.total}` : ended ? 'Quiz complete' : 'Lobby';
+  $('lvl').replaceChildren(...(inQ && s.level ? [levelPill(s.level)] : []));
+  $('question').textContent = inQ ? s.question
+    : ended ? 'That’s a wrap — thanks for playing!'
+    : 'Waiting for the host to start…';
+  const phaseTxt = { lobby: `${s.playerCount} players · ${s.teamCount} teams`, open: 'Buzzers open', closed: 'Buzzers closed', ended: 'Finished' }[s.phase];
+  $('phase').textContent = phaseTxt;
+  $('phase').className = 'pill' + (s.phase === 'open' ? ' hot' : '');
+
+  // who got it right
+  const winner = s.buzzes.find(b => b.result === 'correct');
+  $('result').classList.toggle('hidden', !winner);
+  if (winner) {
+    const mine = winner.team === me.team;
+    $('result').replaceChildren(el('span', '', mine ? '🎉' : '✅'), el('b', '', winner.name), chip(winner), el('span', '', `got it! +${s.points}`));
+  }
+  $('answer').classList.toggle('hidden', !s.answer);
+  $('answer').textContent = s.answer ? `Answer: ${s.answer}` : '';
+
+  // buzzer
+  const teamBuzz = s.buzzes.find(b => b.team === me.team);
+  const teamRank = teamBuzz ? s.buzzes.indexOf(teamBuzz) + 1 : 0;
+  const open = s.phase === 'open' && (!localDeadline || Date.now() < localDeadline);
+  $('buzzArea').classList.toggle('hidden', ended);
+  const btn = $('buzzer');
+  btn.disabled = !open || !!teamBuzz;
+  btn.classList.toggle('done', !!teamBuzz);
+  btn.textContent = teamBuzz ? `#${teamRank}` : 'BUZZ';
+
+  let msg = '', win = false;
+  if (err) msg = err;
+  else if (teamBuzz?.result === 'correct') { msg = `Correct! +${s.points} for ${teamBuzz.team} 🎉`; win = true; }
+  else if (teamBuzz?.result === 'wrong') msg = 'Not quite — better luck next one!';
+  else if (teamBuzz && teamBuzz.name === me.name) { msg = teamRank === 1 ? 'You were FIRST! Get ready to answer 🎯' : `You buzzed #${teamRank}`; win = teamRank === 1; }
+  else if (teamBuzz) msg = `${teamBuzz.name} buzzed for your team (#${teamRank})`;
+  else if (s.phase === 'open') msg = open ? 'Know it? Smash the buzzer!' : 'Time’s up';
+  else if (s.phase === 'closed') msg = 'Buzzers closed';
+  else if (s.phase === 'lobby') msg = `${(myTeamRow?.members || []).length || 1} on your team so far`;
+  $('status').textContent = msg;
+  $('status').className = 'status' + (win ? ' win' : '');
+
+  $('orderCard').classList.toggle('hidden', !s.buzzes.length || ended);
+  $('order').replaceChildren(...s.buzzes.slice(0, 10).map((b, i) => buzzRow(b, i, s.buzzes)));
+
+  // results
+  $('resultsCard').classList.toggle('hidden', !ended);
+  $('peopleCard').classList.toggle('hidden', !ended);
+  if (ended) {
+    $('myRank').replaceChildren();
+    if (myTeamRow) $('myRank').append('Your team finished ', el('b', '', rankWord(myTeamRow.rank)), ` with ${myTeamRow.score} pts`);
+    $('podium').replaceChildren(...podium(s.leaderboard));
+    $('board').replaceChildren(...teamRows(s.leaderboard, me.team));
+    $('people').replaceChildren(...personRows(s.people.slice(0, 10), me));
+  }
+  const anyPoints = s.leaderboard.some(r => r.score !== 0);
+  $('scoreCard').classList.toggle('hidden', ended || !anyPoints);
+  if (!ended && anyPoints) $('scores').replaceChildren(...teamRows(s.leaderboard.slice(0, 8), me.team));
+
+  clearInterval(tick);
+  const showTimer = s.phase === 'open' && localDeadline;
+  $('timerBox').classList.toggle('hidden', !showTimer);
+  if (showTimer) { drawTimer(); tick = setInterval(drawTimer, 100); }
+}
+
+function drawTimer() {
+  const left = Math.max(0, localDeadline - Date.now());
+  $('timerText').textContent = (left / 1000).toFixed(1) + 's';
+  $('timerText').classList.toggle('low', left < 5000);
+  $('bar').querySelector('i').style.transform = `scaleX(${st.timeLimit ? left / (st.timeLimit * 1000) : 0})`;
+  $('bar').classList.toggle('low', left < 5000);
+  if (left === 0) { clearInterval(tick); render(); }
+}
+</script>
+</body>
+</html>

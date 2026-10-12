@@ -1,0 +1,12 @@
+[
+  { "name": "GPT", "emoji": "💬" },
+  { "name": "Gemini", "emoji": "♊" },
+  { "name": "Claude", "emoji": "✴️" },
+  { "name": "Grok", "emoji": "🚀" },
+  { "name": "DeepSeek", "emoji": "🐋" },
+  { "name": "Llama", "emoji": "🦙" },
+  { "name": "Mistral", "emoji": "🌬️" },
+  { "name": "Qwen", "emoji": "🐉" },
+  { "name": "RAG", "emoji": "📚" },
+  { "name": "Transformer", "emoji": "🤖" }
+]

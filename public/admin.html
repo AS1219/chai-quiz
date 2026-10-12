@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChAI Quiz · Host</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .wrap { max-width: 1180px; }
+  .grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; align-items: start; }
+  .grid > div > .card + .card { margin-top: 16px; }
+  .grid > div { min-width: 0; }
+  .qnum { white-space: nowrap; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .controls .primary { padding: 12px 20px; font-size: 15px; }
+  .question { font-size: 26px; }
+  .qlist { max-height: 280px; overflow: auto; margin-top: 10px; padding-right: 4px; }
+  .qlist button { display: block; width: 100%; text-align: left; font-weight: 500; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: rgba(255,255,255,.04); }
+  .qlist button.cur { border-color: var(--violet); background: rgba(139,92,246,.18); color: #fff; }
+  .qlist button.done { color: var(--muted); }
+  .hint { margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .adj { display: flex; gap: 4px; }
+  .adj button { padding: 3px 8px; font-size: 12px; border-radius: 8px; }
+  .kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); }
+  .final { text-align: center; }
+  .final .podium { max-width: 520px; margin-left: auto; margin-right: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="logo">ChAI</span> Quiz · Host</div>
+    <div class="row"><span id="players" class="pill">0 players</span><span id="conn" class="pill off">connecting…</span></div>
+  </header>
+
+  <form id="login" class="card stack" style="max-width:380px;margin:60px auto">
+    <div class="hero"><div class="hero-emo">🎛️</div><h1>Host login</h1></div>
+    <div><label for="pin">Admin PIN</label><input id="pin" type="password" autocomplete="current-password" required></div>
+    <button class="primary block" type="submit">Enter</button>
+    <div id="loginErr" class="err"></div>
+  </form>
+
+  <div id="app" class="hidden">
+    <div class="grid">
+      <!-- left -->
+      <div>
+        <div class="card">
+          <div class="row between"><div class="row" style="gap:0"><div id="qnum" class="qnum"></div><span id="lvl"></span></div><span id="phase" class="pill"></span></div>
+          <div id="question" class="question"></div>
+          <div id="answer" class="answer secret"></div>
+          <div id="timerBox" class="timer hidden">
+            <div class="row between small" style="margin-bottom:7px"><span class="muted">Buzz window</span><span id="timerText" class="timer-text"></span></div>
+            <div id="bar" class="bar"><i></i></div>
+          </div>
+          <div class="controls">
+            <button id="next" class="primary">Start quiz ▶</button>
+            <button id="prev">◀ Prev</button>
+            <button id="lock">Lock buzzers</button>
+            <button id="reopen">Re-open</button>
+            <button id="reveal">Reveal answer</button>
+          </div>
+          <div class="hint">Shortcuts: <span class="kbd">N</span> next · <span class="kbd">←</span> prev · <span class="kbd">L</span> lock · <span class="kbd">R</span> reveal · <span class="kbd">1</span> mark #1 correct · <span class="kbd">X</span> mark #1 wrong</div>
+        </div>
+
+        <div class="card" id="buzzCard">
+          <div class="row between">
+            <h3>Buzz order</h3>
+            <label class="row small" style="margin:0;gap:6px;cursor:pointer"><input id="sound" type="checkbox" checked style="width:auto"> Sound</label>
+          </div>
+          <ul id="buzzes" class="buzzes"></ul>
+          <div id="noBuzz" class="empty">No buzzes yet</div>
+          <div class="hint">Mark <b style="color:var(--good)">✓ Correct</b> to give <span id="ptsTxt">10</span> pts to that person & team (buzzers lock automatically). Click again to undo.</div>
+        </div>
+
+        <div class="card final hidden" id="finalCard">
+          <h2 style="font-size:26px">🏆 Final results</h2>
+          <div id="podium" class="podium"></div>
+          <h3 style="margin-top:14px;text-align:left">⭐ Top players</h3>
+          <ol id="people" class="lb" style="text-align:left"></ol>
+        </div>
+      </div>
+
+      <!-- right -->
+      <div>
+        <div class="card">
+          <h3>Team leaderboard</h3>
+          <ol id="scores" class="lb"></ol>
+          <div id="noTeams" class="empty">No teams yet — share the player link</div>
+        </div>
+
+        <div class="card">
+          <div class="row between">
+            <h3>Questions</h3>
+            <button id="editQ" class="sm">Edit</button>
+          </div>
+          <div id="qlist" class="qlist"></div>
+          <div id="qEditor" class="hidden stack" style="margin-top:10px">
+            <p class="small muted" style="margin:0">One per line: <code>Question | Answer | seconds | level</code> (seconds default 15, 0 = no limit; level = Easy / Medium / Hard, optional).</p>
+            <textarea id="qText"></textarea>
+            <div class="row"><button id="qSave" class="primary">Save questions</button><button id="qCancel">Cancel</button></div>
+          </div>
+        </div>
+
+        <div class="card stack small">
+          <div class="row wrapx"><span class="muted">Player link:</span> <b id="playerLink"></b> <button id="copy" class="sm">Copy</button></div>
+          <div><span class="muted">Projector screen:</span> <a id="screenLink" target="_blank" style="color:var(--cyan)">open /screen ↗</a></div>
+          <div class="row wrapx"><button id="end">End quiz & show results</button><button id="reset" class="bad">Reset all</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/live.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let st = null, token = sessionStorage.getItem('chai-admin-token') || '', stream = null, localDeadline = 0, tick = null, prevBuzzCount = 0;
+
+$('playerLink').textContent = location.origin + '/';
+$('screenLink').href = location.origin + '/screen';
+$('copy').onclick = () => navigator.clipboard?.writeText(location.origin + '/').then(() => toast('Link copied'));
+
+function startStream() {
+  stream?.close();
+  $('login').classList.add('hidden'); $('app').classList.remove('hidden');
+  stream = live({ role: 'admin', token }, onState, (ok) => {
+    $('conn').textContent = ok ? 'live' : 'reconnecting…';
+    $('conn').className = 'pill ' + (ok ? 'live' : 'off');
+    if (!ok) send('ping');
+  });
+}
+$('login').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const res = await api('auth', { pin: $('pin').value });
+  if (!res.ok) { $('loginErr').textContent = res.error; return; }
+  token = res.token; sessionStorage.setItem('chai-admin-token', token);
+  startStream();
+});
+if (token) startStream();
+
+async function send(action, payload = {}) {
+  const r = await api('admin/' + action, payload, token);
+  if (!r.ok) {
+    if (action !== 'ping') toast(r.error);
+    if (String(r.error).includes('log in')) { sessionStorage.removeItem('chai-admin-token'); stream?.close(); $('app').classList.add('hidden'); $('login').classList.remove('hidden'); }
+  }
+  return r;
+}
+$('next').onclick = () => send('next');
+$('prev').onclick = () => send('prev');
+$('lock').onclick = () => send('lock');
+$('reopen').onclick = () => confirm('Re-open this question? Current buzzes will be cleared (points already given stay).') && send('reopen');
+$('reveal').onclick = () => send('reveal');
+$('end').onclick = () => confirm('End the quiz and show final results to everyone?') && send('end');
+$('reset').onclick = () => confirm('Reset to lobby and clear ALL scores?') && send('reset');
+
+document.addEventListener('keydown', (e) => {
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) || !st || e.metaKey || e.ctrlKey) return;
+  const k = e.key.toLowerCase();
+  if ((k === 'n' || k === 'arrowright') && !$('next').disabled) send('next');
+  if (k === 'arrowleft' && !$('prev').disabled) send('prev');
+  if (k === 'l') send('lock');
+  if (k === 'r') send('reveal');
+  if (k === '1' && st.buzzes[0]) mark(0, 'correct');
+  if (k === 'x' && st.buzzes[0]) mark(0, 'wrong');
+});
+
+async function mark(i, result) {
+  const b = st.buzzes[i];
+  await send('mark', { i, result });
+  if (b.result === result) toast('Undone');
+  else if (result === 'correct') toast(`+${st.points} to ${b.name} (${b.team}) 🎉`);
+  else toast(`${b.name} marked wrong — next in line: ${st.buzzes[i + 1]?.name || 'nobody yet'}`);
+}
+
+function onState(s) {
+  const newQ = !st || s.index !== st.index || (s.phase === 'open' && st.phase !== 'open');
+  if (newQ) prevBuzzCount = 0;
+  if (s.buzzes.length > prevBuzzCount && $('sound').checked) beep(s.buzzes.length === 1 ? 880 : 520);
+  prevBuzzCount = s.buzzes.length;
+  st = s;
+  localDeadline = s.remainingMs ? Date.now() + s.remainingMs : 0;
+  render();
+}
+
+function render() {
+  const s = st;
+  const inQ = s.index >= 0 && s.index < s.total;
+  const ended = s.phase === 'ended';
+  $('players').textContent = `${s.playerCount} players · ${s.teamCount} teams`;
+  $('ptsTxt').textContent = s.points;
+  $('qnum').textContent = inQ ? `Question ${s.index + 1} of ${s.total}` : ended ? 'Finished' : 'Lobby';
+  $('lvl').replaceChildren(...(inQ && s.level ? [levelPill(s.level)] : []));
+  $('question').textContent = inQ ? s.question : ended ? 'Quiz finished — results are on everyone’s screen.' : `${s.total} questions loaded. Press Start when everyone has joined.`;
+
+  $('answer').classList.toggle('hidden', !inQ);
+  $('answer').classList.toggle('secret', !s.showAnswer);
+  $('answer').replaceChildren();
+  if (inQ) $('answer').append(s.showAnswer ? 'Answer (shown to players): ' : 'Answer (only you can see): ', el('b', '', s.answer || '—'));
+
+  $('phase').textContent = { lobby: 'Lobby', open: 'Buzzers OPEN', closed: 'Buzzers closed', ended: 'Ended' }[s.phase];
+  $('phase').className = 'pill' + (s.phase === 'open' ? ' hot' : '');
+
+  $('next').textContent = s.index < 0 ? 'Start quiz ▶' : s.index >= s.total - 1 ? 'Finish & show results ▶' : 'Next question ▶';
+  $('next').disabled = ended || !s.total;
+  $('prev').disabled = s.index <= 0;
+  $('lock').disabled = s.phase !== 'open';
+  $('reopen').disabled = !inQ;
+  $('reveal').disabled = !inQ;
+  $('reveal').textContent = s.showAnswer ? 'Hide answer' : 'Reveal answer';
+
+  // buzz list with Correct / Wrong
+  $('buzzCard').classList.toggle('hidden', ended);
+  $('noBuzz').classList.toggle('hidden', s.buzzes.length > 0);
+  $('buzzes').replaceChildren(...s.buzzes.map((b, i) => {
+    const ok = el('button', 'good sm' + (b.result === 'correct' ? ' on' : ''), '✓ Correct');
+    const no = el('button', 'bad sm' + (b.result === 'wrong' ? ' on' : ''), '✗ Wrong');
+    ok.onclick = () => mark(i, 'correct');
+    no.onclick = () => mark(i, 'wrong');
+    const acts = el('div', 'acts'); acts.append(ok, no);
+    return buzzRow(b, i, s.buzzes, [acts]);
+  }));
+
+  // final
+  $('finalCard').classList.toggle('hidden', !ended);
+  if (ended) {
+    $('podium').replaceChildren(...podium(s.leaderboard));
+    $('people').replaceChildren(...personRows(s.people.slice(0, 10)));
+  }
+
+  // leaderboard with manual +/- adjust
+  $('noTeams').classList.toggle('hidden', s.leaderboard.length > 0);
+  $('scores').replaceChildren(...teamRows(s.leaderboard, null, (r) => {
+    const adj = el('div', 'adj');
+    for (const p of [5, -5]) {
+      const b = el('button', '', (p > 0 ? '+' : '−') + Math.abs(p));
+      b.title = `Adjust ${r.team} by ${p}`;
+      b.onclick = () => send('award', { team: r.team, points: p });
+      adj.append(b);
+    }
+    return [adj];
+  }));
+
+  if ($('qEditor').classList.contains('hidden')) {
+    $('qlist').replaceChildren(...s.questions.map((q, i) => {
+      const b = el('button', i === s.index ? 'cur' : i < s.index ? 'done' : '', `${i + 1}. ${q.q}`);
+      if (q.level) b.prepend(levelPill(q.level), ' ');
+      b.title = `${q.q}\nAnswer: ${q.a}\nTime: ${q.time}s`;
+      b.onclick = () => confirm(`Jump to question ${i + 1}?`) && send('goto', { index: i });
+      return b;
+    }));
+  }
+
+  clearInterval(tick);
+  const showTimer = s.phase === 'open' && localDeadline;
+  $('timerBox').classList.toggle('hidden', !showTimer);
+  if (showTimer) { drawTimer(); tick = setInterval(drawTimer, 100); }
+}
+
+function drawTimer() {
+  const left = Math.max(0, localDeadline - Date.now());
+  $('timerText').textContent = (left / 1000).toFixed(1) + 's';
+  $('timerText').classList.toggle('low', left < 5000);
+  $('bar').querySelector('i').style.transform = `scaleX(${st.timeLimit ? left / (st.timeLimit * 1000) : 0})`;
+  $('bar').classList.toggle('low', left < 5000);
+  if (!left) clearInterval(tick);
+}
+
+$('editQ').onclick = () => {
+  $('qText').value = st.questions.map(q => `${q.q} | ${q.a || ''} | ${q.time ?? 15} | ${q.level || ''}`).join('\n');
+  $('qEditor').classList.remove('hidden'); $('qlist').classList.add('hidden');
+};
+$('qCancel').onclick = () => { $('qEditor').classList.add('hidden'); $('qlist').classList.remove('hidden'); render(); };
+$('qSave').onclick = async () => {
+  const list = $('qText').value.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    const [q, a = '', t = '', level = ''] = l.split('|').map(x => x.trim());
+    return { q, a, time: t, level };
+  });
+  await send('questions', { list });
+  $('qEditor').classList.add('hidden'); $('qlist').classList.remove('hidden');
+  toast(`Saved ${list.length} questions`);
+};
+
+let ctx;
+function beep(freq) {
+  try {
+    ctx ||= new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = freq; o.type = 'triangle'; g.gain.value = 0.15;
+    o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.2);
+  } catch {}
+}
+</script>
+</body>
+</html>

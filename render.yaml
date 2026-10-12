@@ -1,0 +1,14 @@
+# Render Blueprint — New + → Blueprint → pick this repo
+services:
+  - type: web
+    name: chai-quiz
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /
+    envVars:
+      - key: ADMIN_PIN
+        sync: false        # Render asks you for this value when you create it
+      - key: NODE_VERSION
+        value: "22"

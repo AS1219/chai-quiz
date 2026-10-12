@@ -1,0 +1,12 @@
+{
+  "name": "chai-quiz-buzzer",
+  "version": "1.0.0",
+  "description": "Live quiz buzzer for ChAI sessions - players buzz in, host sees the order instantly. Zero dependencies.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

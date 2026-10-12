@@ -1,0 +1,122 @@
+[
+  {
+    "q": "Gemini is the AI assistant from which company?",
+    "a": "Google",
+    "level": "Easy",
+    "time": 15
+  },
+  {
+    "q": "The 'Copilot' AI built into Windows, Office and GitHub comes from which company?",
+    "a": "Microsoft",
+    "level": "Easy",
+    "time": 15
+  },
+  {
+    "q": "The maximum amount of text a model can handle at once is called its…?",
+    "a": "Context window",
+    "level": "Medium",
+    "time": 15
+  },
+  {
+    "q": "What do we call the text or instruction you give to an AI?",
+    "a": "A prompt",
+    "level": "Easy",
+    "time": 15
+  },
+  {
+    "q": "Which model setting controls how random or 'creative' the output is?",
+    "a": "Temperature",
+    "level": "Hard",
+    "time": 15
+  },
+  {
+    "q": "Claude, Cursor and many AI tools connect to other apps using 'MCP'. What does MCP stand for?",
+    "a": "Model Context Protocol",
+    "level": "Hard",
+    "time": 15
+  },
+  {
+    "q": "Training an existing model further on your own data to make it better at a specific task is called…?",
+    "a": "Fine-tuning",
+    "level": "Medium",
+    "time": 15
+  },
+  {
+    "q": "Turning text into a list of numbers that captures its meaning — used for semantic search and RAG — is called creating…?",
+    "a": "Embeddings",
+    "level": "Hard",
+    "time": 15
+  },
+  {
+    "q": "LLMs don't read whole words — they read text split into small chunks. What are those chunks called?",
+    "a": "Tokens",
+    "level": "Medium",
+    "time": 15
+  },
+  {
+    "q": "The hidden instructions a developer gives an AI to set its role and rules — before the user types anything — are called the ______ prompt?",
+    "a": "System prompt",
+    "level": "Medium",
+    "time": 15
+  },
+  {
+    "q": "Putting a few worked examples inside your prompt so the AI copies the pattern is called…?",
+    "a": "Few-shot prompting",
+    "level": "Hard",
+    "time": 15
+  },
+  {
+    "q": "Which company makes Claude?",
+    "a": "Anthropic",
+    "level": "Easy",
+    "time": 15
+  },
+  {
+    "q": "An AI that can plan steps and use tools on its own to finish a task is called an AI…?",
+    "a": "Agent",
+    "level": "Medium",
+    "time": 15
+  },
+  {
+    "q": "What does 'LLM' stand for?",
+    "a": "Large Language Model",
+    "level": "Easy",
+    "time": 15
+  },
+  {
+    "q": "When an AI confidently makes up facts that aren't true, it's called…?",
+    "a": "Hallucination",
+    "level": "Easy",
+    "time": 15
+  },
+  {
+    "q": "Which company releases the open-weight Llama models?",
+    "a": "Meta",
+    "level": "Medium",
+    "time": 15
+  },
+  {
+    "q": "What does RAG stand for?",
+    "a": "Retrieval-Augmented Generation",
+    "level": "Medium",
+    "time": 15
+  },
+  {
+    "q": "Asking an AI to 'think step by step' before giving its final answer is called ______ prompting?",
+    "a": "Chain-of-thought",
+    "level": "Hard",
+    "time": 15
+  },
+  {
+    "q": "Which company makes ChatGPT?",
+    "a": "OpenAI",
+    "level": "Easy",
+    "time": 15
+  },
+  {
+    "q": "Hiding instructions in an email or web page to trick an AI into ignoring its real instructions is called…?",
+    "a": "Prompt injection",
+    "level": "Hard",
+    "time": 15
+  }
+]

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChAI Quiz · Screen</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  body { overflow: hidden; }
+  .stage { height: 100vh; display: grid; grid-template-rows: auto 1fr auto; padding: 3.5vh 4vw; gap: 3vh; }
+  .stage .brand { font-size: clamp(22px, 2.2vw, 36px); }
+  .stage .logo { font-size: clamp(16px, 1.6vw, 26px); padding: 6px 14px; }
+  .stage .pill { font-size: clamp(13px, 1.1vw, 18px); padding: 7px 16px; }
+  .center { display: grid; align-content: center; gap: 3vh; min-height: 0; }
+  .stage .question { font-size: clamp(30px, 4.4vw, 72px); line-height: 1.15; margin-top: 1.5vh; }
+  .stage .qnum { font-size: clamp(14px, 1.4vw, 24px); }
+  .stage .answer, .stage .banner { font-size: clamp(20px, 2.2vw, 36px); padding: 1.6vh 1.6vw; border-radius: 20px; }
+  .stage .banner .chip { font-size: clamp(16px, 1.5vw, 24px); }
+  .lobby { display: grid; grid-template-columns: auto 1fr; gap: 5vw; align-items: center; }
+  .qr { width: min(36vh, 32vw); background: #fff; padding: 14px; border-radius: 22px; box-shadow: 0 0 80px rgba(139, 92, 246, 0.5); }
+  .qr img, .qr canvas { width: 100% !important; height: auto !important; display: block; }
+  .joinurl { font-family: var(--display); font-size: clamp(22px, 2.6vw, 44px); margin-top: 2vh; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700; }
+  .teams-joined { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 3vh; }
+  .teams-joined .chip { font-size: clamp(14px, 1.3vw, 20px); }
+  .bottom { display: grid; grid-template-columns: 1.3fr 1fr; gap: 3vw; align-items: end; }
+  .bottom .buzzes li { padding: 1.3vh 1vw; }
+  .bottom .buzzes .who b { font-size: clamp(16px, 1.6vw, 26px); }
+  .bigtimer { font-family: var(--display); font-size: clamp(48px, 8vw, 140px); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; text-align: right;
+    background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .bigtimer.low { background: linear-gradient(90deg, #f43f5e, #fb923c); -webkit-background-clip: text; background-clip: text; }
+  .bigtimer.note { font-size: clamp(28px, 3.4vw, 56px); }
+  .final { display: grid; grid-template-columns: 1.2fr 1fr; gap: 4vw; align-items: center; }
+  .final .podium .pemo { font-size: clamp(40px, 5vw, 80px); }
+  .final .podium .pteam { font-size: clamp(14px, 1.5vw, 24px); }
+  .final .podium .pscore { font-size: clamp(12px, 1.2vw, 18px); }
+  .final .podium .p1 .block { height: 26vh; } .final .podium .p2 .block { height: 19vh; } .final .podium .p3 .block { height: 14vh; }
+  .final .podium .block { font-size: clamp(28px, 3vw, 52px); }
+  .final .lb li { padding: 1vh 4px; }
+  .final .lb .pts { font-size: clamp(16px, 1.6vw, 26px); }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="row between">
+    <div class="brand"><span class="logo">ChAI</span> Quiz</div>
+    <span id="count" class="pill"></span>
+  </div>
+
+  <div class="center">
+    <div id="lobby" class="lobby">
+      <div id="qr" class="qr"></div>
+      <div>
+        <div class="question" style="margin:0">Scan to join ⚡</div>
+        <div class="joinurl" id="joinUrl"></div>
+        <div id="joined" class="teams-joined"></div>
+      </div>
+    </div>
+    <div id="qbox" class="hidden">
+      <div class="row" style="gap:0"><div id="qnum" class="qnum"></div><span id="lvl"></span></div>
+      <div id="question" class="question"></div>
+      <div id="result" class="banner hidden"></div>
+      <div id="answer" class="answer hidden"></div>
+    </div>
+    <div id="final" class="final hidden">
+      <div>
+        <h1 style="font-size:clamp(32px,4vw,64px)">🏆 Final results</h1>
+        <div id="podium" class="podium"></div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:clamp(16px,1.4vw,22px)">⭐ Top players</h3>
+        <ol id="people" class="lb"></ol>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom" id="bottom">
+    <div><ul id="buzzes" class="buzzes"></ul></div>
+    <div>
+      <div id="bigtimer" class="bigtimer"></div>
+      <ol id="scores" class="lb" style="margin-top:2vh"></ol>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/live.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let st, localDeadline = 0, tick;
+$('joinUrl').textContent = location.origin.replace(/^https?:\/\//, '');
+try { new QRCode($('qr'), { text: location.origin + '/', width: 512, height: 512, correctLevel: QRCode.CorrectLevel.M }); }
+catch { $('qr').remove(); } // QR library unavailable: the URL text is still shown
+live({ role: 'screen' }, (s) => { st = s; localDeadline = s.remainingMs ? Date.now() + s.remainingMs : 0; render(); });
+
+function render() {
+  const s = st, inQ = s.index >= 0 && s.index < s.total, ended = s.phase === 'ended';
+  $('count').textContent = `${s.playerCount} players · ${s.teamCount} teams`;
+  $('lobby').classList.toggle('hidden', s.phase !== 'lobby');
+  $('qbox').classList.toggle('hidden', !inQ);
+  $('final').classList.toggle('hidden', !ended);
+  $('bottom').classList.toggle('hidden', ended);
+
+  $('joined').replaceChildren(...s.teamList.filter(t => t.count).map(t => { const c = chip(t, 'lg'); c.lastChild.textContent += ` · ${t.count}`; return c; }));
+
+  $('qnum').textContent = inQ ? `Question ${s.index + 1} / ${s.total}` : '';
+  $('lvl').replaceChildren(...(inQ && s.level ? [levelPill(s.level)] : []));
+  $('question').textContent = inQ ? s.question : '';
+  const winner = s.buzzes.find(b => b.result === 'correct');
+  $('result').classList.toggle('hidden', !winner);
+  if (winner) $('result').replaceChildren(el('span', '', '✅'), el('b', '', winner.name), chip(winner), el('span', '', `got it! +${s.points}`));
+  $('answer').classList.toggle('hidden', !s.answer);
+  $('answer').textContent = s.answer ? `Answer: ${s.answer}` : '';
+
+  $('buzzes').replaceChildren(...s.buzzes.slice(0, 4).map((b, i) => buzzRow(b, i, s.buzzes)));
+  const anyPts = s.leaderboard.some(r => r.score);
+  $('scores').replaceChildren(...(anyPts ? teamRows(s.leaderboard.slice(0, 5)) : []));
+
+  if (ended) {
+    $('podium').replaceChildren(...podium(s.leaderboard));
+    $('people').replaceChildren(...personRows(s.people.slice(0, 6)));
+  }
+
+  clearInterval(tick);
+  $('bigtimer').className = 'bigtimer';
+  if (s.phase === 'open' && localDeadline) { draw(); tick = setInterval(draw, 100); }
+  else { $('bigtimer').textContent = s.phase === 'closed' && inQ ? (winner ? '' : 'Time’s up') : ''; $('bigtimer').classList.add('note'); }
+}
+function draw() {
+  const left = Math.max(0, localDeadline - Date.now());
+  $('bigtimer').textContent = Math.ceil(left / 1000) + 's';
+  $('bigtimer').classList.toggle('low', left < 5000);
+  if (!left) { clearInterval(tick); $('bigtimer').textContent = 'Time’s up'; $('bigtimer').classList.add('note'); }
+}
+</script>
+</body>
+</html>
